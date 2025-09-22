@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>轉盤抽獎</title>
+  <style>
+    :root{
+      --bg:#f7f8fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --accent:#2563eb; --ok:#10b981; --danger:#ef4444; --shadow:0 10px 20px rgba(0,0,0,.06)
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", Arial; background:var(--bg); color:var(--text)}
+    .container{max-width:1100px;margin:24px auto;padding:0 16px}
+    h1{font-weight:900;margin:4px 0 16px;font-size:clamp(20px,3.6vw,32px)}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    @media (max-width:920px){.grid{grid-template-columns:1fr}}
+    .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px}
+    .muted{color:var(--muted);font-size:14px}
+    textarea{width:100%;min-height:220px;border:1px solid #e5e7eb;border-radius:12px;padding:12px;resize:vertical;font-size:14px;line-height:1.5}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid #e5e7eb;background:#fff;border-radius:999px;padding:8px 12px}
+    .pill input[type="number"]{width:64px;border:none;outline:none;font-weight:700}
+    button{appearance:none;border:none;background:var(--accent);color:#fff;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 6px 14px rgba(37,99,235,.18);transition:transform .06s ease, filter .2s ease}
+    button:hover{filter:brightness(1.05)}
+    button:active{transform:translateY(1px)}
+    button.ghost{background:#fff;color:#111827;border:1px solid #e5e7eb;box-shadow:none}
+    button.ok{background:var(--ok);box-shadow:0 6px 14px rgba(16,185,129,.18)}
+    button.danger{background:var(--danger);box-shadow:0 6px 14px rgba(239,68,68,.18)}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+    .stat{flex:1 1 160px;background:#fafafa;border:1px solid #eef2f7;padding:10px 12px;border-radius:12px}
+    .stat b{display:block;font-size:20px;margin-top:2px}
+
+    /* Wheel */
+    .stage-wrap{display:grid;place-items:center}
+    .wheel-wrap{position:relative;width:min(420px,80vw);aspect-ratio:1;border-radius:50%;}
+    .wheel{position:absolute;inset:0;border-radius:50%;
+      background:
+        conic-gradient(#fef3c7 0 15deg,#dbeafe 0 30deg,#fde68a 0 45deg,#e9d5ff 0 60deg,#bbf7d0 0 75deg,#fee2e2 0 90deg,
+                       #fef3c7 0 105deg,#dbeafe 0 120deg,#fde68a 0 135deg,#e9d5ff 0 150deg,#bbf7d0 0 165deg,#fee2e2 0 180deg,
+                       #fef3c7 0 195deg,#dbeafe 0 210deg,#fde68a 0 225deg,#e9d5ff 0 240deg,#bbf7d0 0 255deg,#fee2e2 0 270deg,
+                       #fef3c7 0 285deg,#dbeafe 0 300deg,#fde68a 0 315deg,#e9d5ff 0 330deg,#bbf7d0 0 345deg,#fee2e2 0 360deg);
+      border:10px solid #111827; box-shadow:inset 0 0 0 10px #fff, 0 10px 20px rgba(0,0,0,.12);
+    }
+    .wheel.deco::before{content:"";position:absolute;inset:20px;border-radius:50%;
+      background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.9), rgba(255,255,255,.5) 50%, transparent 60%);
+      pointer-events:none}
+    .hub{position:absolute;inset:40% 40%;border-radius:50%;background:#111827;box-shadow:0 6px 16px rgba(0,0,0,.25)}
+    .hub::after{content:"";position:absolute;inset:25%;border-radius:50%;background:#fff}
+    .pointer{position:absolute;left:50%;top:-18px;transform:translateX(-50%);width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-bottom:26px solid #ef4444;filter:drop-shadow(0 2px 2px rgba(0,0,0,.2))}
+
+    .spin{animation:spin 1.2s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .winner{font-weight:900;font-size:clamp(28px,6vw,54px);letter-spacing:.5px;text-align:center;margin-top:12px}
+    .anim{animation:pop .7s ease}
+    @keyframes pop{0%{transform:scale(.6);opacity:.2}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+
+    .history{max-height:280px;overflow:auto;border:1px solid #eef2f7;border-radius:12px}
+    .history table{width:100%;border-collapse:collapse}
+    .history th,.history td{padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:left;font-size:14px}
+    .history tr:nth-child(even){background:#fafafa}
+    .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#1e40af;font-weight:700;font-size:12px}
+
+    .footer-note{margin-top:10px;font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>竹興國小班親會抽獎</h1>
+    <div class="grid">
+      <section class="card">
+        <h2>名單管理 <span class="muted">（每行一位，可貼姓名、學號或編號）</span></h2>
+        <textarea id="list" placeholder="例：\n1\n2\n3\n…"></textarea>
+        <div class="row">
+          <button class="ghost" id="btn150">快速填入 1–150</button>
+          <button class="ghost" id="btnShuffle">隨機打亂</button>
+          <button class="ghost" id="btnClear">清空名單</button>
+          <label class="pill"><input type="checkbox" id="noRepeat" checked> 不重複中獎</label>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="muted">名單總數</span><b id="statTotal">0</b></div>
+          <div class="stat"><span class="muted">可抽人數</span><b id="statPool">0</b></div>
+          <div class="stat"><span class="muted">已中獎</span><b id="statWon">0</b></div>
+        </div>
+        <p class="footer-note" text-red=600>這個轉盤僅供視覺效果：轉動動畫與實際結果無關，結果由公平隨機（Math.random）決定。</p>
+      </section>
+
+      <section class="card">
+        <h2>轉盤舞台</h2>
+        <div class="stage-wrap">
+          <div class="wheel-wrap">
+            <div class="pointer"></div>
+            <div id="wheel" class="wheel deco"></div>
+            <div class="hub"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="ok" id="btnSpin">開始轉動並抽 1 位</button>
+          <button class="ghost" id="btnCopyWinners">複製得獎名單</button>
+          <button class="ghost" id="btnExportWinners">匯出得獎名單 .txt</button>
+          <button class="ghost" id="btnUndo">復原上一次抽獎</button>
+          <button class="danger" id="btnResetPool" title="把已中獎的人放回名單">重置抽獎池</button>
+        </div>
+        <div id="winner" class="winner">準備抽獎！</div>
+        <h3 style="margin-top:14px">中獎紀錄</h3>
+        <div class="history">
+          <table>
+            <thead><tr><th style="width:56px">#</th><th>得獎者</th><th style="width:120px">時間</th></tr></thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const listEl = document.getElementById('list');
+    const statTotal = document.getElementById('statTotal');
+    const statPool = document.getElementById('statPool');
+    const statWon = document.getElementById('statWon');
+
+    const wheel = document.getElementById('wheel');
+    const winnerEl = document.getElementById('winner');
+    const historyBody = document.getElementById('historyBody');
+
+    const btn150 = document.getElementById('btn150');
+    const btnShuffle = document.getElementById('btnShuffle');
+    const btnClear = document.getElementById('btnClear');
+    const btnSpin = document.getElementById('btnSpin');
+    const btnCopyWinners = document.getElementById('btnCopyWinners');
+    const btnExportWinners = document.getElementById('btnExportWinners');
+    const btnUndo = document.getElementById('btnUndo');
+    const btnResetPool = document.getElementById('btnResetPool');
+    const noRepeatEl = document.getElementById('noRepeat');
+
+    let pool = [];      // 可抽名單
+    let winners = [];   // 得獎名單（依序）
+    let lastPick = null;// 上一次抽到
+
+    function parseList(text){
+      return text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    }
+    function unique(arr){
+      const seen = new Set(); const out=[]; for(const v of arr){if(!seen.has(v)){seen.add(v); out.push(v)}} return out;
+    }
+    function shuffle(arr){
+      for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}
+      return arr;
+    }
+    function buildPool(){ pool = unique(parseList(listEl.value)); refreshStats(); }
+    function refreshStats(){ statTotal.textContent=parseList(listEl.value).length; statPool.textContent=pool.length; statWon.textContent=winners.length; }
+
+    function showWinner(name){
+      winnerEl.textContent=name; winnerEl.classList.remove('anim'); void winnerEl.offsetWidth; winnerEl.classList.add('anim');
+      // 紀錄
+      const tr = document.createElement('tr');
+      const idx = document.createElement('td'); idx.textContent = winners.length;
+      const who = document.createElement('td'); who.textContent = name;
+      const when = document.createElement('td'); when.textContent = new Date().toLocaleTimeString();
+      tr.appendChild(idx); tr.appendChild(who); tr.appendChild(when);
+      historyBody.prepend(tr);
+    }
+
+    function pickOne(){
+      if(pool.length===0) return null;
+      const i = Math.floor(Math.random()*pool.length);
+      const val = pool[i];
+      if(noRepeatEl.checked){ pool.splice(i,1); }
+      return val;
+    }
+
+    function spinAndPick(){
+      if(pool.length===0){ winnerEl.textContent='名單或抽獎池為空'; return; }
+      // 假轉盤：純視覺旋轉
+      wheel.classList.add('spin');
+      btnSpin.disabled = true; btnSpin.textContent = '轉動中…';
+      const duration = 1800 + Math.random()*1800; // 1.8s–3.6s
+      setTimeout(()=>{
+        wheel.classList.remove('spin');
+        const picked = pickOne();
+        if(picked==null){ winnerEl.textContent='沒有可抽的名單'; btnSpin.disabled=false; btnSpin.textContent='開始轉動並抽 1 位'; return; }
+        winners.push(picked); lastPick = picked; refreshStats(); showWinner(picked);
+        btnSpin.disabled=false; btnSpin.textContent='開始轉動並抽 1 位';
+      }, duration);
+    }
+
+    // 綁定事件
+    listEl.addEventListener('input', buildPool);
+    btn150.addEventListener('click', ()=>{ listEl.value = Array.from({length:150},(_,i)=>String(i+1)).join('\n'); buildPool(); });
+    btnShuffle.addEventListener('click', ()=>{ const arr=parseList(listEl.value); shuffle(arr); listEl.value=arr.join('\n'); buildPool(); });
+    btnClear.addEventListener('click', ()=>{ listEl.value=''; buildPool(); winners=[]; historyBody.innerHTML=''; winnerEl.textContent=''; });
+    btnResetPool.addEventListener('click', ()=>{ buildPool(); winnerEl.textContent='抽獎池已重置'; });
+
+    btnSpin.addEventListener('click', spinAndPick);
+
+    btnUndo.addEventListener('click', ()=>{
+      if(lastPick==null) return;
+      // 從 winners 移除最後一個
+      const idx = winners.lastIndexOf(lastPick);
+      if(idx>-1) winners.splice(idx,1);
+      // 放回抽獎池
+      pool.push(lastPick); pool = unique(pool); refreshStats();
+      // 從紀錄移除一列（最新一列）
+      const firstRow = historyBody.querySelector('tr'); if(firstRow) firstRow.remove();
+      winnerEl.textContent='已復原上一筆'; lastPick = null;
+    });
+
+    btnCopyWinners.addEventListener('click', async ()=>{
+      const text = winners.join('\n');
+      try{ await navigator.clipboard.writeText(text); winnerEl.textContent='已複製得獎名單'; }
+      catch{ alert('瀏覽器不支援自動複製，請手動選取複製。'); }
+    });
+
+    btnExportWinners.addEventListener('click', ()=>{
+      const blob = new Blob([winners.join('\n')], {type:'text/plain;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='winners.txt'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // 初始化
+    listEl.value = Array.from({length:150},(_,i)=>String(i+1)).join('\n');
+    buildPool();
+    winnerEl.textContent='準備抽獎！';
+  </script>
+</body>
+</html>
